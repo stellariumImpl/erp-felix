@@ -24,11 +24,12 @@
 
     <!-- 工单 Modal -->
     <WorkOrderModal
-      :is-open="showModal"
-      :edit-mode="isEditMode"
-      :initial-data="editingOrder"
-      @close="handleModalClose"
-      @submit="handleModalSubmit"
+    :is-open="showModal"
+    :edit-mode="isEditMode"
+    :initial-data="editingOrder"
+    @close="handleModalClose"
+    @submit="handleModalSubmit"
+    @refresh="refreshList" 
     />
 
     <!-- 工单表格 -->
@@ -120,17 +121,15 @@
           <div>
             <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
               <button
-                @click="currentPage > 1 && (currentPage--)"
+                @click="handlePageChange(currentPage - 1)"
                 :disabled="currentPage === 1"
                 class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
               >
                 上一页
               </button>
-              <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                {{ currentPage }} / {{ totalPages }}
-              </span>
+
               <button
-                @click="currentPage < totalPages && (currentPage++)"
+                @click="handlePageChange(currentPage + 1)"
                 :disabled="currentPage === totalPages"
                 class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
               >
@@ -150,6 +149,9 @@ import { useAuthStore } from '../store/auth'
 import { getWorkOrders, deleteWorkOrder,updateWorkOrder } from '../api/workOrder'
 
 import WorkOrderModal from '../components/workorder/WorkOrderModal.vue'
+
+import { message } from 'ant-design-vue';  // Ant Design Vue 消息组件
+import axios from 'axios';
 
 const authStore = useAuthStore()
 const workOrders = ref([])
@@ -184,7 +186,10 @@ const displayWorkOrders = computed(() => {
 
 // 计算分页信息
 const startIndex = computed(() => (currentPage.value - 1) * pageSize)
-const endIndex = computed(() => startIndex.value + pageSize)
+const endIndex = computed(() => {
+  const end = startIndex.value + pageSize - 1;
+  return Math.min(end, totalItems.value);
+});
 
 // 格式化日期
 const formatDate = (date) => {
@@ -215,22 +220,42 @@ const canDelete = (order) => {
   return canEdit(order) // 使用相同的权限逻辑
 }
 
+
+// 分页处理函数
+const handlePageChange = (newPage) => {
+  if (newPage >= 1 && newPage <= totalPages.value) {
+    currentPage.value = newPage;
+    fetchWorkOrders();
+  }
+};
+
+
 // 获取工单列表
 // 移除对工单列表的筛选，允许所有用户查看所有工单
+
 const fetchWorkOrders = async () => {
   try {
-    const response = await getWorkOrders({
-      page: currentPage.value,
-      limit: 10,
-      area: filterArea.value || undefined
-    })
-    workOrders.value = response.data.workOrders
-    totalPages.value = response.data.totalPages
-    totalItems.value = response.data.total
+    const { data } = await axios.get('/api/workorders', {
+      params: {
+        page: currentPage.value,
+        limit: pageSize,
+        area: filterArea.value || undefined
+      },
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+
+    workOrders.value = data.records || [];
+    totalItems.value = data.total || 0;
+    totalPages.value = data.pages || 1;
+    currentPage.value = data.page || 1;
+
   } catch (error) {
-    console.error('获取工单列表失败:', error)
+    console.error('获取工单列表失败:', error);
+    message.error('获取工单列表失败');
   }
-}
+};
 
 // 删除工单
 const confirmDelete = async (order) => {
@@ -256,10 +281,15 @@ const editOrder = (order) => {
   console.log('编辑工单:', order)
 }
 
-// 监听筛选条件变化
+// 监听筛选和搜索变化
 watch([filterArea, currentPage], () => {
-  fetchWorkOrders()
-})
+  fetchWorkOrders();
+});
+
+// 初始化加载
+onMounted(() => {
+  fetchWorkOrders();
+});
 
 // 监听搜索条件变化（使用防抖）
 let searchTimeout
@@ -269,12 +299,7 @@ watch(searchQuery, () => {
     currentPage.value = 1
     fetchWorkOrders()
   }, 300)
-})
-
-// 初始加载
-onMounted(() => {
-  fetchWorkOrders()
-})
+});
 
 
 
@@ -296,22 +321,24 @@ const handleModalClose = () => {
   isEditMode.value = false
 }
 
+// 刷新工单列表的函数
+const refreshList = () => {
+  fetchWorkOrders();
+};
+
 const handleModalSubmit = async (formData) => {
   try {
     if (editingOrder.value) {
-      // 编辑模式
-      await updateWorkOrder(editingOrder.value._id, formData)
+      await updateWorkOrder(editingOrder.value._id, formData);
     } else {
-      // 创建模式
-      await createWorkOrder(formData)
+      await createWorkOrder(formData);
     }
-    await fetchWorkOrders() // 刷新列表
-    isEditMode.value = false
-    editingOrder.value = null
-    showModal.value = false
+    message.success(editingOrder.value ? '更新成功' : '创建成功');
+    await refreshList(); // 刷新列表
+    handleModalClose();
   } catch (error) {
-    console.error('操作失败:', error)
-    alert('操作失败: ' + (error.response?.data?.message || '未知错误'))
+    console.error('操作失败:', error);
+    message.error(error.response?.data?.message || '操作失败');
   }
-}
+};
 </script>

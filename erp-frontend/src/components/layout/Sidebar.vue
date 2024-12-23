@@ -1,4 +1,3 @@
-// components/layout/Sidebar.vue
 <template>
   <div class="w-64 bg-white shadow-sm min-h-screen">
     <nav class="mt-5 px-2">
@@ -28,12 +27,27 @@
         <UserGroupIcon class="mr-3 h-6 w-6 text-gray-400" />
         用户管理
       </router-link>
+
+      <!-- 新增行车运用表管理入口 -->
+      <router-link
+        v-if="['admin', 'boss'].includes(authStore.userRole)"
+        to="/crane-config"
+        class="mt-1 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+        :class="[
+          $route.path === '/crane-config'
+            ? 'bg-gray-100 text-gray-900'
+            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+        ]"
+      >
+        <TableCellsIcon class="mr-3 h-6 w-6 text-gray-400" />
+        行车运用表
+      </router-link>
     </nav>
   </div>
 </template>
 
 <script setup>
-import { DocumentTextIcon, UserGroupIcon } from '@heroicons/vue/24/outline'
+import { DocumentTextIcon, UserGroupIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '../../store/auth'
 
 const authStore = useAuthStore()

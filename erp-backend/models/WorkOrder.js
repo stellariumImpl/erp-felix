@@ -55,44 +55,50 @@ const workOrderSchema = new mongoose.Schema({
   sparePartsName: {
     type: String,
     required: function() {
-      return this.hasSpareParts;
+      return this.hasSpareParts === true;
     }
   },
   sparePartsSpecification: {
     type: String,
     required: function() {
-      return this.hasSpareParts;
+      return this.hasSpareParts === true;
     }
   },
   sparePartsUnit: {
     type: String,
+    enum: ['米', '个', '组', '件'],
     required: function() {
-      return this.hasSpareParts;
-    },
-    enum: ['米', '个', '组', '件']
+      return this.hasSpareParts === true;
+    }
   },
   sparePartsQuantity: {
     type: Number,
     required: function() {
-      return this.hasSpareParts;
-    }
+      return this.hasSpareParts === true;
+    },
+    min: 0
   },
   remarks: {
     type: String
   },
   status: {
     type: String,
-    enum: ['pending', 'completed', 'cancelled'],
-    default: 'pending'
+    enum: ['pending', 'success', 'cancel'],
+    default: 'pending'  // 确保新建时默认为 pending
   },
-  created: {
-    type: Date,
-    default: Date.now
-  },
-  creator: {
+  approver: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    // 关键修改：创建时不要求必填
+    required: false
+  },
+  approveTime: {
+    type: Date,
+    required: false  // 不要求必填
+  },
+  approveComment: {
+    type: String,
+    required: false  // 不要求必填
   },
   lastModifiedBy: {
     type: mongoose.Schema.Types.ObjectId,

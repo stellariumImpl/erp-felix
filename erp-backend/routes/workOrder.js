@@ -2,51 +2,81 @@
 const express = require('express');
 const router = express.Router();
 const WorkOrder = require('../models/WorkOrder');
+const mongoose = require('mongoose'); // 添加这行
 const auth = require('../middleware/auth');
 
 // 创建工单
+// routes/workOrder.js
 router.post('/', auth, async (req, res) => {
   try {
-    console.log('Received work order data:', req.body)
-    console.log('User:', req.user)
-
-    const workOrder = new WorkOrder({
+    const workOrderData = {
       ...req.body,
       creator: req.user.userId,
-      lastModifiedBy: req.user.userId
-    })
+      lastModifiedBy: req.user.userId,
+      status: 'pending'
+    };
 
-    console.log('Created work order:', workOrder)
+    // 如果没有使用备件，把备件字段设为 null
+    if (!workOrderData.hasSpareParts) {
+      workOrderData.sparePartsName = null;
+      workOrderData.sparePartsSpecification = null;
+      workOrderData.sparePartsUnit = null;
+      workOrderData.sparePartsQuantity = null;
+    }
 
-    await workOrder.save()
-    console.log('Work order saved successfully')
+    // 删除空字符串字段
+    Object.keys(workOrderData).forEach(key => {
+      if (workOrderData[key] === '') {
+        workOrderData[key] = null;
+      }
+    });
 
-    res.status(201).json({ message: '工单创建成功', workOrder })
+    const workOrder = new WorkOrder(workOrderData);
+    await workOrder.save();
+
+    res.status(201).json({
+      message: '工单创建成功',
+      workOrder
+    });
+
   } catch (error) {
-    console.error('创建工单失败:', error)
-    res.status(500).json({ message: '服务器错误', error: error.message })
+    console.error('创建工单失败:', error);
+    res.status(500).json({
+      message: '创建工单失败',
+      error: error.message
+    });
   }
-})
+});
 
 // routes/workOrder.js
 router.get('/', auth, async (req, res) => {
   try {
-    // 不再根据用户角色筛选工单，允许所有用户查看所有工单
-    const query = {}
-    if (req.query.area) query.area = req.query.area;
-    
-    const total = await WorkOrder.countDocuments(query);
-    const workOrders = await WorkOrder.find(query)
-      .sort('-createdAt')
-      .populate('creator', 'username role')
-      .populate('lastModifiedBy', 'username')
-      
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // 获取总数
+    const total = await WorkOrder.countDocuments();
+
+    // 获取分页数据
+    const records = await WorkOrder.find()
+    .populate('creator', 'username role')
+    .populate('lastModifiedBy', 'username role')
+    .populate('approver', 'username role')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
     res.json({
-      workOrders,
-      total,
-      totalPages: Math.ceil(total / 10)
+      records,             // 当前页的记录
+      total,              // 总记录数
+      page,               // 当前页码
+      pages: Math.ceil(total / limit)  // 总页数
     });
+
   } catch (error) {
+    console.error('获取工单列表错误:', error);
     res.status(500).json({ message: '服务器错误' });
   }
 });
@@ -162,13 +192,16 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 // routes/workOrder.js
-router.get('/export', auth, async (req, res) => {
+router.get('/workorders/export', auth, async (req, res) => {
   try {
+    console.log('开始导出所有工单');  // 添加日志
+    
     const workOrders = await WorkOrder.find()
       .populate('creator', 'username')
       .lean();
-
-    // 确保所有字段都被包含在导出数据中
+      
+    console.log('查询到的工单数量:', workOrders.length);  // 添加日志
+    
     const exportData = workOrders.map(order => ({
       area: order.area,
       crane: order.crane,
@@ -188,11 +221,73 @@ router.get('/export', auth, async (req, res) => {
       createdAt: order.createdAt
     }));
 
+    console.log('处理后的数据:', exportData.length);  // 添加日志
+    
     res.json(exportData);
   } catch (error) {
-    console.error('Export error:', error);
-    res.status(500).json({ message: '导出失败', error: error.message });
+    console.error('导出错误:', error);
+    res.status(500).json({ 
+      message: '导出失败', 
+      error: error.message,
+      stack: error.stack  // 添加错误堆栈信息
+    });
   }
 });
+
+
+// routes/workOrder.js
+// 审批路由
+router.put('/:id/approve', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, approveComment } = req.body;
+
+    // 查找并检查工单
+    const workOrder = await WorkOrder.findById(id);
+    if (!workOrder) {
+      return res.status(404).json({ message: '工单不存在' });
+    }
+
+    // 检查工单状态
+    if (workOrder.status !== 'pending') {
+      return res.status(400).json({ 
+        message: '该工单已被审批',
+        currentStatus: workOrder.status 
+      });
+    }
+
+    // 权限检查
+    if (!['admin', 'boss'].includes(req.user.role)) {
+      return res.status(403).json({ message: '无权审批工单' });
+    }
+
+    // 更新工单
+    const updatedWorkOrder = await WorkOrder.findOneAndUpdate(
+      { _id: id, status: 'pending' },
+      {
+        status,
+        approver: req.user.userId,  // 确认这里正确设置了审批人
+        approveTime: new Date(),
+        approveComment,
+        lastModifiedBy: req.user._id,
+        lastModifiedAt: new Date()
+      },
+      { new: true }
+    )
+    .populate([
+      { path: 'creator', select: 'username role' },
+      { path: 'approver', select: 'username role' },  // 确保正确填充审批人
+      { path: 'lastModifiedBy', select: 'username role' }
+    ]);
+
+    console.log('Updated work order:', updatedWorkOrder);  // 添加日志检查数据
+
+    res.json(updatedWorkOrder);
+  } catch (error) {
+    console.error('审批失败:', error);
+    res.status(500).json({ message: '审批失败', error: error.message });
+  }
+});
+
 
 module.exports = router;

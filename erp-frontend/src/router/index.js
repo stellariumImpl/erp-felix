@@ -49,6 +49,15 @@ const routes = [
         name: 'UserManagement',
         component: () => import('../views/UserManagement.vue'),
         meta: { roles: ['admin', 'boss'] }
+      },
+      {
+        path: '/crane-config',
+        name: 'CraneConfig',
+        component: () => import('../views/CraneConfigView.vue'),
+        meta: {
+          requiresAuth: true,
+          roles: ['admin', 'boss']
+        }
       }
     ]
   }

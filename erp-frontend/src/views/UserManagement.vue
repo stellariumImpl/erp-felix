@@ -3,12 +3,12 @@
   <div class="p-6">
     <div class="flex justify-between mb-6">
       <h2 class="text-2xl font-bold">用户管理</h2>
-      <button
+      <!-- <button
         @click="exportAllData"
         class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
       >
         导出汇总表
-      </button>
+      </button> -->
     </div>
 
     <!-- 用户列表 -->
@@ -85,8 +85,8 @@
                     class="px-2 py-1 rounded-full text-xs"
                     :class="{
                       'bg-yellow-100 text-yellow-800': order.status === 'pending',
-                      'bg-green-100 text-green-800': order.status === 'completed',
-                      'bg-red-100 text-red-800': order.status === 'cancelled'
+                      'bg-green-100 text-green-800': order.status === 'success',
+                      'bg-red-100 text-red-800': order.status === 'cancel'
                     }"
                   >
                     {{ order.status }}
@@ -165,74 +165,75 @@ const toggleUserExpand = async (userId) => {
   }
 }
 
-const exportAllData = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('未登录');
-    }
+// const exportAllData = async () => {
+//   try {
+//     const response = await fetch('http://localhost:3000/api/workorders/export', {
+//       headers: {
+//         'Authorization': `Bearer ${localStorage.getItem('token')}`
+//       }
+//     });
 
-    const response = await fetch('http://localhost:3000/api/workorders/export', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+//     if (!response.ok) {
+//       throw new Error('导出失败');
+//     }
 
-    if (!response.ok) {
-      throw new Error('服务器响应错误');
-    }
+//     const workOrders = await response.json();
 
-    const data = await response.json();
-    if (!Array.isArray(data)) {
-      throw new Error('返回数据格式错误');
-    }
+//     // 处理导出数据，保持与单个用户导出相同的字段结构
+//     const exportData = workOrders.map(order => ({
+//       '区域': order.area || '',
+//       '行车': order.crane || '',
+//       '设备状况': order.equipmentStatus || '',
+//       '开始时间': formatDate(order.startTime),
+//       '结束时间': formatDate(order.endTime),
+//       '时长(小时)': order.duration || '',
+//       '班次': order.shift || '',
+//       '作业类型': order.workType || '',
+//       '作业属性': order.workProperty || '',
+//       '故障类型': order.faultType || '',
+//       '是否消耗备件': order.hasSpareParts ? '是' : '否',
+//       '备件名称': order.sparePartsName || '',
+//       '状态': order.status || '',
+//       '创建人': order.creator?.username || '',
+//       '备注': order.remarks || ''
+//     }));
 
-    if (data.length === 0) {
-      alert('没有可导出的数据');
-      return;
-    }
+//     // 创建工作簿
+//     const wb = XLSX.utils.book_new();
+//     const ws = XLSX.utils.json_to_sheet(exportData);
 
-    // 创建工作簿
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(data);
+//     // 设置相同的列宽
+//     ws['!cols'] = [
+//       { wch: 10 }, // 区域
+//       { wch: 10 }, // 行车
+//       { wch: 30 }, // 设备状况
+//       { wch: 20 }, // 开始时间
+//       { wch: 20 }, // 结束时间
+//       { wch: 10 }, // 时长
+//       { wch: 8 },  // 班次
+//       { wch: 12 }, // 作业类型
+//       { wch: 12 }, // 作业属性
+//       { wch: 12 }, // 故障类型
+//       { wch: 12 }, // 是否消耗备件
+//       { wch: 15 }, // 备件名称
+//       { wch: 10 }, // 状态
+//       { wch: 10 }, // 创建人
+//       { wch: 30 }  // 备注
+//     ];
 
-    // 设置列宽
-    const wscols = [
-      { wch: 10 }, // 区域
-      { wch: 10 }, // 行车
-      { wch: 20 }, // 设备状况
-      { wch: 20 }, // 开始时间
-      { wch: 20 }, // 结束时间
-      { wch: 8 },  // 时长
-      { wch: 8 },  // 班次
-      { wch: 12 }, // 作业类型
-      { wch: 12 }, // 作业属性
-      { wch: 12 }, // 故障类型
-      { wch: 8 },  // 消耗备件
-      { wch: 15 }, // 备件名称
-      { wch: 15 }, // 备件
-      { wch: 15 }, // 备件
-      { wch: 15 }, // 备件
-      { wch: 10 }, // 创建人
-      { wch: 30 }  // 备注
-    ];
-    ws['!cols'] = wscols;
+//     XLSX.utils.book_append_sheet(wb, ws, '工单汇总');
+//     XLSX.writeFile(wb, '工单汇总表.xlsx');
 
-    XLSX.utils.book_append_sheet(wb, ws, '工单汇总');
-    XLSX.writeFile(wb, '工单汇总报表.xlsx');
-
-  } catch (error) {
-    console.error('导出失败:', error);
-    alert('导出失败: ' + error.message);
-  }
-};
+//   } catch (error) {
+//     console.error('导出失败:', error);
+//     alert('导出失败: ' + error.message);
+//   }
+// };
 
 // 导出单个用户的工单
-const exportUserData = async (userId,username) => {
+const exportUserData = async (userId, username) => {
   try {
-    const response = await fetch(`http://localhost:3000/api/users/${userId}/workorders/export`, {
+    const response = await fetch(`/api/users/${userId}/workorders/export`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
@@ -243,31 +244,38 @@ const exportUserData = async (userId,username) => {
     }
 
     const workOrders = await response.json();
-    
-    // 处理导出数据
-    const exportData = workOrders.map(order => ({
-      '区域': order.area || '',
-      '行车': order.crane || '',
-      '设备状况': order.equipmentStatus || '',
-      '开始时间': formatDate(order.startTime),
-      '结束时间': formatDate(order.endTime),
-      '时长(小时)': order.duration || '',
-      '班次': order.shift || '',
-      '作业类型': order.workType || '',
-      '作业属性': order.workProperty || '',
-      '故障类型': order.faultType || '',
-      '是否消耗备件': order.hasSpareParts ? '是' : '否',
-      '备件名称': order.sparePartsName || '',
-      '状态': order.status || '',
-      '创建人': order.creator?.username || '',
-      '备注': order.remarks || ''
-    }));
+    console.log('原始数据:', workOrders); // 添加日志查看原始数据结构
 
-    // 创建工作簿
+    const exportData = workOrders.map(order => {
+      // 创建导出行数据前先打印原始工单数据
+      console.log('正在处理的工单:', order);
+      
+      return {
+        '区域': order.区域 || order.area || '',
+        '行车': order.行车 || order.crane || '',
+        '设备状况': order.设备状况 || order.equipmentStatus || '',
+        '开始时间': order.开始时间 || order.startTime || '',
+        '结束时间': order.结束时间 || order.endTime || '',
+        '时长(小时)': order.时长 || order.duration || '',
+        '班次': order.班次 || order.shift || '',
+        '作业类型': order.作业类型 || order.workType || '',
+        '作业属性': order.作业属性 || order.workProperty || '',
+        '故障类型': order.故障类型 || order.faultType || '',
+        '是否消耗备件': order.是否消耗备件 || order.hasSpareParts ? '是' : '否',
+        '备件名称': order.备件名称 || order.sparePartsName || '',
+        '备件规格': order.备件规格 || order.sparePartsSpecification || '',
+        '备件数量': order.备件数量 || order.sparePartsQuantity || '',
+        '备件单位': order.备件单位 || order.sparePartsUnit || '',
+        '状态': order.状态 || order.status || '',
+        '创建人': order.创建人 || (order.creator?.username) || '',
+        '备注': order.备注 || order.remarks || ''
+      };
+    });
+
+    // 后续代码保持不变
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(exportData);
 
-    // 设置列宽
     ws['!cols'] = [
       { wch: 10 }, // 区域
       { wch: 10 }, // 行车
@@ -288,12 +296,12 @@ const exportUserData = async (userId,username) => {
 
     XLSX.utils.book_append_sheet(wb, ws, `${username}的工单`);
     XLSX.writeFile(wb, `${username}工单报表.xlsx`);
+
   } catch (error) {
     console.error('导出失败:', error);
     alert('导出失败: ' + error.message);
   }
 };
-
 
 onMounted(() => {
   fetchUsers()

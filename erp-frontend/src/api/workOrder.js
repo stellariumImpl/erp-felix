@@ -49,3 +49,4 @@ export const deleteWorkOrder = (id) => {
 export const updateWorkOrder = (id, data) => {
   return api.put(`/workorders/${id}`, data)
 }
+

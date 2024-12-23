@@ -94,17 +94,13 @@ const isDropdownOpen = ref(false)
 const showWorkOrderModal = ref(false)  // add modal
 
 // 处理工单提交
-// 修改提交处理函数
 const handleWorkOrderSubmit = async (formData) => {
   try {
-    const response = await createWorkOrder(formData)
-    console.log('工单创建成功:', response.data)
+    // TODO: 调用 API 保存工单
+    console.log('工单数据:', formData)
     showWorkOrderModal.value = false
-    // 可以添加成功提示
-    alert('工单创建成功')
   } catch (error) {
     console.error('保存工单失败:', error)
-    alert('工单创建失败: ' + (error.response?.data?.message || '未知错误'))
   }
 }
 
