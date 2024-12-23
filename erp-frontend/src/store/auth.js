@@ -1,11 +1,12 @@
-// src/store/auth.js
+// store/auth.js
 import { defineStore } from 'pinia'
 import { login, register, getCurrentUser } from '../api/auth'
-import router from '../router' // 直接导入 router 实例
+
+import router from '../router'  // 直接导入 router
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    user: null,
+    user: JSON.parse(localStorage.getItem('user')) || null,
     token: localStorage.getItem('token') || null,
     loading: false,
     error: null
@@ -14,6 +15,7 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     userRole: (state) => state.user?.role || null,
+    userId: (state) => state.user?.id || null
   },
 
   actions: {
@@ -21,14 +23,11 @@ export const useAuthStore = defineStore('auth', {
       try {
         this.loading = true
         this.error = null
-        // 移除发送的 role
-        const { data } = await login({
-          username: credentials.username,
-          password: credentials.password
-        })
+        const { data } = await login(credentials)
         this.token = data.token
         this.user = data.user
         localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
         return true
       } catch (error) {
         this.error = error.response?.data?.message || '登录失败'
@@ -52,23 +51,13 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async fetchCurrentUser() {
-      try {
-        const { data } = await getCurrentUser()
-        this.user = data
-        return true
-      } catch (error) {
-        return false
-      }
-    },
-
     logout() {
       this.user = null
       this.token = null
       this.error = null
-      this.loading = false
       localStorage.removeItem('token')
-      router.push('/login') // 使用导入的 router 实例
+      localStorage.removeItem('user')
+      window.location.href = '/login'  // 使用 window.location.href 替代 router.push
     }
   }
 })

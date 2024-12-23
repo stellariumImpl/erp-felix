@@ -4,6 +4,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const authRoutes = require('./routes/auth');
+const workOrderRoutes = require('./routes/workOrder'); // 移到顶部
+const userRoutes = require('./routes/user');
 
 const app = express();
 
@@ -11,8 +13,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 路由
+// 路由注册 - 把所有路由放在一起
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);         // 用户管理路由
+app.use('/api/workorders', workOrderRoutes);
+
+// 添加日志中间件方便调试
+app.use((req, res, next) => {
+  console.log('Request:', req.method, req.path);
+  next();
+});
 
 // 错误处理中间件
 app.use((err, req, res, next) => {
@@ -22,6 +32,13 @@ app.use((err, req, res, next) => {
     error: process.env.NODE_ENV === 'development' ? err.message : {}
   });
 });
+
+// backend/app.js
+app.use(cors({
+  origin: 'http://localhost:5173',  // 前端开发服务器地址
+  credentials: true
+}));
+
 
 // 连接数据库
 mongoose.connect(process.env.MONGODB_URI)
